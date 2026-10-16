@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 328033349803437941}
   - component: {fileID: 1260176773620968366}
   - component: {fileID: 574014216626024044}
+  - component: {fileID: 2096632239187740871}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -92,3 +93,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a98fcc4105b79c747bc4bb2531c59a40, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Navigator
+--- !u!114 &2096632239187740871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3432614345183546375}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b0b2cc236e72f04f9e8731409c614df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Radar
+  rayCount: 100
+  radarMask:
+    serializedVersion: 2
+    m_Bits: 8

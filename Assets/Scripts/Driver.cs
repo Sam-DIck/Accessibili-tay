@@ -35,4 +35,21 @@ public class Driver : MonoBehaviour
         subController.Move(throttleInput, turnInput);
         subController.RotatePeriscope(periscopeInput);
     }
+
+    public void SetVibrations(float L, float R)
+    {
+        L = Mathf.Clamp01(L);
+        R = Mathf.Clamp01(R);
+        if (playerInput.devices.Count > 0)
+        {
+            foreach (var device in playerInput.devices)
+            {
+                if (device is Gamepad gamepad)
+                {
+                    Debug.Log($"Setting vibrations: L={L}, R={R}");
+                    gamepad.SetMotorSpeeds(L, R);
+                }
+            }
+        }
+    }
 }

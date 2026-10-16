@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class SubController : MonoBehaviour
 {
@@ -19,6 +20,8 @@ public class SubController : MonoBehaviour
     [SerializeField] float turnAcceleration = 180f;
     [SerializeField] float turnDrag = 2f;
     [SerializeField] float steeringAtLowSpeed = 0.4f;
+
+    public Vector2 position => new Vector2(boat.position.x, boat.position.y);
 
     float throttleInput;
     float steeringInput;
