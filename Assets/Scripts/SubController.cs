@@ -22,6 +22,7 @@ public class SubController : MonoBehaviour
     [SerializeField] float steeringAtLowSpeed = 0.4f;
 
     public Vector2 position => new Vector2(boat.position.x, boat.position.y);
+    public float rotation => boat.rotation;
 
     float throttleInput;
     float steeringInput;
