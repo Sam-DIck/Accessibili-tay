@@ -156,6 +156,6 @@ MonoBehaviour:
   rayCount: 100
   radarMask:
     serializedVersion: 2
-    m_Bits: 8
-  blipOn: 0
-  blipTimer: 0
+    m_Bits: 64
+  angleOffset: 90
+  flipAngle: 0
