@@ -1,97 +1,171 @@
-using Unity.VisualScripting;
+
 using UnityEngine;
 
 public class Radar : MonoBehaviour
 {
-    Driver driver;
-    SubController subController;
+    private Driver driver;
+    private SubController subController;
 
-    [SerializeField] AnimationCurve blipOnTime = new(new Keyframe(0f, 0.1f), new Keyframe(1f, 0.1f));
-    [SerializeField] AnimationCurve blipOffTime = new(new Keyframe(0f, 10f), new Keyframe(1f, 0.5f));
+    [Header("Treasure Detection")]
+    [SerializeField] private string treasureTag = "Treasure";
 
-    // 
-    static float mapPing(float dist)
+    [Header("Vibration Timing")]
+    [SerializeField]
+    private AnimationCurve blipOnTime =
+        new AnimationCurve(
+            new Keyframe(0f, 0.1f),
+            new Keyframe(1f, 0.1f)
+        );
+
+    [SerializeField]
+    private AnimationCurve blipOffTime =
+        new AnimationCurve(
+            new Keyframe(0f, 10f),
+            new Keyframe(1f, 0.5f)
+        );
+
+    [Header("Vibration")]
+    [SerializeField, Range(0f, 1f)]
+    private float vibrationStrength = 1f;
+
+    private bool blipOn;
+    private float blipTimer;
+
+    private void Awake()
     {
-        dist = Mathf.Max(0f, dist);
-        return Mathf.Clamp01((dist) / (1f + dist));
+        driver = GetComponent<Driver>();
+        subController = FindAnyObjectByType<SubController>();
     }
 
-    [SerializeField] int rayCount = 100;
-    [SerializeField] LayerMask radarMask;
-    [SerializeField] float angleOffset = 90f;
-    [SerializeField] bool flipAngle = false;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Awake()
+    private void Update()
     {
-        driver ??= GetComponent<Driver>();
-        subController ??= FindAnyObjectByType<SubController>();
-    }
-    
-    bool blipOn = false;
-    float blipTimer = 0f;
+        if (driver == null || !driver.enabled)
+            return;
 
-    // Update is called once per frame
-    void Update()
-    {
-        Vector2 position = subController.position;
-        float rotation = subController.rotation * Mathf.Deg2Rad;
-        Debug.Log(position);
-        if (driver == null || !driver.enabled) return;
+        if (subController == null)
+            return;
 
-        float angleStep = 2 * Mathf.PI / rayCount;
+        // Get the submarine's position.
+        Vector2 playerPosition = subController.position;
 
-        float closestDistance = float.PositiveInfinity;
-        float closestAngle = 0; // initialise dead ahead
-        for (int i = 0; i < rayCount; i++)
+        // Find all treasures in the scene.
+        GameObject[] treasures = GameObject.FindGameObjectsWithTag(treasureTag);
+
+        Transform nearestTreasure = null;
+        float closestDistanceSquared = float.PositiveInfinity;
+
+        foreach (GameObject treasure in treasures)
         {
-            float angle = i * angleStep;
-            Vector2 dir = new Vector2(Mathf.Sin(angle), Mathf.Cos(angle));
-            Ray2D ray = new Ray2D(position, dir);
-            RaycastHit2D hit = Physics2D.Raycast(ray.origin, ray.direction, Mathf.Infinity, radarMask);
-            if (hit)
+            if (treasure == null)
+                continue;
+
+            Vector2 treasurePosition = treasure.transform.position;
+
+            // Squared distance avoids unnecessary square roots.
+            float distanceSquared =
+                (treasurePosition - playerPosition).sqrMagnitude;
+
+            if (distanceSquared < closestDistanceSquared)
             {
-                float distance = hit.distance;
-                Debug.DrawLine(position, position + new Vector2(Mathf.Sin(angle), Mathf.Cos(angle)) * distance, Color.green);
-                if (distance < closestDistance)
-                {
-                    closestDistance = distance;
-                    closestAngle = angle;
-                }
+                closestDistanceSquared = distanceSquared;
+                nearestTreasure = treasure.transform;
             }
         }
 
-
-        Debug.DrawLine(position, position + new Vector2(Mathf.Sin(closestAngle), Mathf.Cos(closestAngle)) * closestDistance, Color.red);
-
-        float correctedAngle = (closestAngle - rotation) * (flipAngle ? -1f : 1f) + angleOffset * Mathf.Deg2Rad;
-        float normailsedAngle = (correctedAngle + Mathf.PI) % (2 * Mathf.PI) - Mathf.PI;
-        Debug.Log($"closestAngle {closestAngle * Mathf.Rad2Deg} rotation {rotation * Mathf.Rad2Deg} normailsedAngle {normailsedAngle * Mathf.Rad2Deg}");
-
-        // 0 is dead ahead/behind, -90 is left, 90 is right
-        float bal = Mathf.Sin(normailsedAngle);
-        if (driver)
+        // No treasure exists.
+        if (nearestTreasure == null)
         {
-            float pingFactor = mapPing(closestDistance);
-            Debug.Log($"blipOn: {blipOn}, closestDistance: {closestDistance} ({pingFactor})");
-            blipTimer += Time.deltaTime;
-            if (blipOn)
+            blipOn = false;
+            blipTimer = 0f;
+            driver.SetVibrations(0f, 0f);
+            return;
+        }
+
+        Vector2 treasureDirection =
+            ((Vector2)nearestTreasure.position - playerPosition).normalized;
+
+        // Assumes rotation 0 degrees means the submarine faces upward.
+        float rotation = subController.rotation * Mathf.Deg2Rad;
+
+        Vector2 forward = new Vector2(
+            Mathf.Sin(rotation),
+            Mathf.Cos(rotation)
+        );
+
+        // Dot product: positive = in front, negative = behind.
+        float dot = Vector2.Dot(forward, treasureDirection);
+
+        // 2D cross product: determines the side of the forward vector.
+        float cross =
+            forward.x * treasureDirection.y -
+            forward.y * treasureDirection.x;
+
+        bool treasureInFront = dot > 0f;
+
+        // Positive cross = left; negative cross = right
+        // under this forward-vector convention.
+        bool treasureOnLeft = cross < -0.001f;
+        bool treasureOnRight = cross > 0.001f;
+
+        // Debug visualization.
+        Debug.DrawLine(
+            playerPosition,
+            playerPosition + forward * 3f,
+            Color.blue
+        );
+
+        Debug.DrawLine(
+            playerPosition,
+            nearestTreasure.position,
+            Color.red
+        );
+
+        // Distance-based pulse timing.
+        float distance = Mathf.Sqrt(closestDistanceSquared);
+
+        float pingFactor = Mathf.Clamp01(
+            distance / (1f + distance)
+        );
+
+        blipTimer += Time.deltaTime;
+
+        if (blipOn)
+        {
+            if (blipTimer >= blipOnTime.Evaluate(pingFactor))
             {
-                if (blipTimer > blipOnTime.Evaluate(pingFactor))
-                {
-                    blipOn = false;
-                    blipTimer = 0f;
-                }
-                driver.SetVibrations(-bal, bal);
+                blipOn = false;
+                blipTimer = 0f;
+            }
+
+            if (treasureOnLeft)
+            {
+                driver.SetVibrations(vibrationStrength, 0f);
+            }
+            else if (treasureOnRight)
+            {
+                driver.SetVibrations(0f, vibrationStrength);
             }
             else
             {
-                if (blipTimer > blipOffTime.Evaluate(pingFactor))
-                {
-                    blipOn = true;
-                    blipTimer = 0f;
-                }
-                driver.SetVibrations(0, 0);
+                // Treasure is directly in front of or behind the submarine.
+                driver.SetVibrations(0f, 0f);
             }
         }
+        else
+        {
+            if (blipTimer >= blipOffTime.Evaluate(pingFactor))
+            {
+                blipOn = true;
+                blipTimer = 0f;
+            }
+
+            driver.SetVibrations(0f, 0f);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (driver != null)
+            driver.SetVibrations(0f, 0f);
     }
 }
